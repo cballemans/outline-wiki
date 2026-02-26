@@ -1,0 +1,128 @@
+
+---
+- name: Provision Outline Wiki on Azure VM
+  hosts: outline
+  become: true
+  vars:
+    outline_root: /opt/outline
+    compose_file: /opt/outline/docker-compose.yml
+    outline_env_file: /opt/outline/.env
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install base packages (Docker, Nginx, Certbot)
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Install Docker Engine (official convenience script)
+      shell: |
+        curl -fsSL https://get.docker.com | sh
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Install docker compose plugin
+      apt:
+        name: docker-compose-plugin
+        state: present
+
+    - name: Ensure outline root exists
+      file:
+        path: "{{ outline_root }}"
+        state: directory
+        mode: '0755'
+
+    - name: Generate secrets if not set (SECRET_KEY / UTILS_SECRET)
+      set_fact:
+        outline_secret_key: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=40') }}"
+        outline_utils_secret: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=40') }}"
+      when: outline_secret_key is not defined or outline_utils_secret is not defined
+
+    - name: Render Outline .env
+      template:
+        src: outline.env.j2
+        dest: "{{ outline_env_file }}"
+        mode: '0600'
+
+    - name: Render docker-compose.yml
+      template:
+        src: docker-compose.yml.j2
+        dest: "{{ compose_file }}"
+        mode: '0644'
+
+    - name: Start containers
+      shell: |
+        docker compose -f {{ compose_file }} --env-file {{ outline_env_file }} up -d
+      args:
+        executable: /bin/bash
+
+    - name: Run database migrations
+      shell: |
+        docker compose -f {{ compose_file }} --env-file {{ outline_env_file }} exec -T outline yarn db:migrate
+      args:
+        executable: /bin/bash
+
+    - name: Configure Nginx site
+      copy:
+        dest: /etc/nginx/sites-available/outline.conf
+        mode: '0644'
+        content: |
+          server {
+            listen 80;
+            server_name {{ outline_domain }};
+
+            location / {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+            }
+          }
+
+    - name: Enable site
+      file:
+        src: /etc/nginx/sites-available/outline.conf
+        dest: /etc/nginx/sites-enabled/outline.conf
+        state: link
+        force: yes
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
+
+    - name: Obtain/renew Let's Encrypt certificate via nginx plugin
+      shell: |
+        certbot --nginx -d {{ outline_domain }} --email {{ certbot_email }} --agree-tos --non-interactive
+      args:
+        executable: /bin/bash
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Output login URL
+      debug:
+        msg: "Visit https://{{ outline_domain }} to complete sign-in with Azure AD."

@@ -1,0 +1,28 @@
+
+version: '3.8'
+services:
+  redis:
+    image: redis:7
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: gateway azure --address ":9000" --console-address ":9001"
+    environment:
+      MINIO_ACCESS_KEY: "{{ azure_storage_account }}"
+      MINIO_SECRET_KEY: "{{ azure_storage_key }}"
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    restart: unless-stopped
+
+  outline:
+    image: outlinewiki/outline:latest
+    depends_on:
+      - redis
+      - minio
+    env_file:
+      - {{ outline_env_file }}
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped

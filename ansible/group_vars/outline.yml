@@ -1,0 +1,23 @@
+
+---
+ansible_user: "outlineadmin"
+ansible_ssh_private_key_file: "~/.ssh/outline"
+
+# Domain and email
+outline_domain: "wiki.mccoy-partners.com"
+certbot_email: "casper.ballemans@mccoy-partners.com"
+
+# OAuth (populated by CI via --extra-vars or env)
+oidc_tenant_id: "91f2f599-24f7-4b73-bdcf-d30f018c1002"
+oidc_client_id: ""
+oidc_client_secret: ""
+
+# Azure Storage for MinIO Gateway (S3 over Blob) - from TF outputs / CI
+azure_storage_account: ""
+azure_storage_key: ""
+
+# Postgres from Terraform outputs
+postgres_fqdn: ""
+postgres_db: "outline"
+postgres_user: ""
+postgres_password: ""
