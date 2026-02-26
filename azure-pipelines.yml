@@ -1,0 +1,106 @@
+trigger: none   # manual runs only; enable triggers if you want
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  TF_IN_AUTOMATION: true
+
+stages:
+# ------------------------------
+#  Terraform Stage
+# ------------------------------
+- stage: Terraform
+  displayName: "Terraform Plan & Apply"
+  jobs:
+  - job: terraform
+    displayName: "Run Terraform"
+    steps:
+
+    - checkout: self
+      clean: true
+
+    - task: AzureCLI@2
+      displayName: "Terraform Init & Apply"
+      inputs:
+        azureSubscription: "svc-conn-terraform"   # Azure DevOps Service Connection Name
+        scriptType: bash
+        scriptLocation: inlineScript
+        workingDirectory: terraform
+        inlineScript: |
+          echo "Initializing backend..."
+          terraform init \
+            -backend-config="resource_group_name=$(TF_BACKEND_RG)" \
+            -backend-config="storage_account_name=$(TF_BACKEND_SA)" \
+            -backend-config="container_name=$(TF_BACKEND_CONTAINER)" \
+            -backend-config="key=$(TF_BACKEND_KEY)"
+
+          echo "Creating tfvars..."
+          cat > ci.auto.tfvars <<EOF
+          admin_ssh_public_key = "$(SSH_PUBLIC_KEY)"
+          project_name = "mccoy-outline"
+          location = "westeurope"
+          domain_name = "wiki.mccoy-partners.com"
+          tenant_id = "91f2f599-24f7-4b73-bdcf-d30f018c1002"
+          certbot_email = "casper.ballemans@mccoy-partners.com"
+          EOF
+
+          echo "Running terraform apply..."
+          terraform apply -auto-approve
+
+    - task: AzureCLI@2
+      displayName: "Capture Terraform Outputs"
+      name: outputs
+      inputs:
+        azureSubscription: "svc-conn-terraform"
+        scriptType: bash
+        scriptLocation: inlineScript
+        workingDirectory: terraform
+        inlineScript: |
+          echo "##vso[task.setvariable variable=public_ip]$(terraform output -raw public_ip)"
+          echo "##vso[task.setvariable variable=postgres_fqdn]$(terraform output -raw postgres_fqdn)"
+          echo "##vso[task.setvariable variable=postgres_db]$(terraform output -raw postgres_database)"
+          echo "##vso[task.setvariable variable=postgres_user]$(terraform output -raw postgres_username)"
+          echo "##vso[task.setvariable variable=storage_account_name]$(terraform output -raw storage_account_name)"
+
+# ------------------------------
+#  Ansible Stage
+# ------------------------------
+- stage: Ansible
+  displayName: "Configure VM via Ansible"
+  dependsOn: Terraform
+  jobs:
+  - job: ansible
+    displayName: "Run Ansible Playbook"
+    steps:
+
+    - checkout: self
+
+    - script: |
+        mkdir -p ~/.ssh
+        echo "$(SSH_PRIVATE_KEY)" > ~/.ssh/outline
+        chmod 600 ~/.ssh/outline
+        ssh-keyscan -H $(public_ip) >> ~/.ssh/known_hosts
+      displayName: "Install SSH Key & Known Hosts"
+
+    - script: |
+        sudo apt-get update
+        sudo apt-get install -y ansible
+      displayName: "Install Ansible"
+
+    - script: |
+        echo "[outline]" > ansible/hosts.ini
+        echo "outline ansible_host=$(public_ip)" >> ansible/hosts.ini
+      displayName: "Generate Inventory"
+
+    - script: |
+        ansible-playbook \
+          -i ansible/hosts.ini ansible/outline.yml \
+          --extra-vars "oidc_client_id=$(OIDC_CLIENT_ID) oidc_client_secret='$(OIDC_CLIENT_SECRET)'" \
+          --extra-vars "azure_storage_account=$(storage_account_name) azure_storage_key='$(AZURE_STORAGE_KEY)'" \
+          --extra-vars "postgres_fqdn=$(postgres_fqdn) postgres_db=$(postgres_db) postgres_user=$(postgres_user) postgres_password='$(POSTGRES_PASSWORD_OVERRIDE)'"
+      displayName: "Run Ansible"
+
+    - publish: ansible
+      artifact: "ansible-logs"
+      displayName: "Publish Logs"
