@@ -24,7 +24,7 @@ Outline expects an S3-compatible API when not using local storage. MinIO’s **A
    ```bash
    ./scripts/bootstrap/create-remote-backend.sh rg-tf-backend westeurope stoutlineXXXX tfstate
    ```
-   Then pass those values to `terraform init` or the GitHub Action. citeturn3search28
+   Then pass those values to `terraform init` or the GitHub Action.
 3. DNS A-record: `wiki.mccoy-partners.com` → VM public IP (output after apply)
 4. SSH keypair for the VM admin (store pub/priv in GitHub Secrets)
 5. Azure AD App Registration (OIDC) with redirect `https://wiki.mccoy-partners.com/auth/oidc.callback`, scopes `openid profile email`. Collect **Client ID/Secret** and **Tenant ID**. 
