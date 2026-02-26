@@ -3,7 +3,7 @@
 
 This repository deploys **Outline Wiki** (getoutline.com) on **Azure** using **Terraform** and configures it with **Ansible**. The install follows the **official recommendation to self-host with Docker**, and connects to a **managed Azure PostgreSQL** database. File uploads are stored in **Azure Blob** and exposed to Outline via an **S3-compatible MinIO gateway**.
 
-> Outline's self-host docs recommend Docker for production, and require PostgreSQL, Redis, and S3-compatible (or local) storage; OAuth is required for login. citeturn3search37turn3search43
+> Outline's self-host docs recommend Docker for production, and require PostgreSQL, Redis, and S3-compatible (or local) storage; OAuth is required for login. 
 
 ## What this deploys
 - Azure Resource Group, VNet/Subnets, NSG, Public IP, NIC
@@ -15,8 +15,7 @@ This repository deploys **Outline Wiki** (getoutline.com) on **Azure** using **T
 - OAuth via **Azure AD (OIDC)**
 
 ### Why MinIO gateway for Azure Blob?
-Outline expects an S3-compatible API when not using local storage. MinIO’s **Azure gateway** maps S3 calls to Azure Blob using the storage account name/key and works as an S3 endpoint for your app. citeturn8search54turn8search52
-
+Outline expects an S3-compatible API when not using local storage. MinIO’s **Azure gateway** maps S3 calls to Azure Blob using the storage account name/key and works as an S3 endpoint for your app. 
 ---
 
 ## Prerequisites
@@ -28,8 +27,7 @@ Outline expects an S3-compatible API when not using local storage. MinIO’s **A
    Then pass those values to `terraform init` or the GitHub Action. citeturn3search28
 3. DNS A-record: `wiki.mccoy-partners.com` → VM public IP (output after apply)
 4. SSH keypair for the VM admin (store pub/priv in GitHub Secrets)
-5. Azure AD App Registration (OIDC) with redirect `https://wiki.mccoy-partners.com/auth/oidc.callback`, scopes `openid profile email`. Collect **Client ID/Secret** and **Tenant ID**. citeturn3search48
-
+5. Azure AD App Registration (OIDC) with redirect `https://wiki.mccoy-partners.com/auth/oidc.callback`, scopes `openid profile email`. Collect **Client ID/Secret** and **Tenant ID**. 
 ---
 
 ## Configure GitHub Secrets
@@ -40,9 +38,7 @@ Outline expects an S3-compatible API when not using local storage. MinIO’s **A
 - `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` — Azure AD app credentials
 - (Optional) `POSTGRES_PASSWORD_OVERRIDE` — if you want to override the generated password
 
-> The Outline container will connect to Azure PostgreSQL over SSL (`sslmode=require`), consistent with production guidance. citeturn3search43
-
----
+> The Outline container will connect to Azure PostgreSQL over SSL (`sslmode=require`), consistent with production guidance.
 
 ## One‑click deploy with GitHub Actions
 1. Push this repo to GitHub.
@@ -73,11 +69,11 @@ ansible-playbook -i hosts.ini outline.yml   --extra-vars "oidc_client_id=... oid
 - **Outline Docker image / env requirements** incl. Postgres/Redis/S3: [doc mirror](citeturn3search50)
 - **OIDC with Outline** (Dex/Azure AD examples): [blog + config](citeturn3search48)
 - **MinIO Azure gateway (S3 over Blob)**: [MS Learn sample](citeturn8search50), [GitLab docs](citeturn8search52), [Article/example command](citeturn8search54)
-- **Terraform Azure Linux VM resource** (Ubuntu 22.04 reference): [registry](citeturn3search13)
+- **Terraform Azure Linux VM resource** (Ubuntu 22.04 reference): [registry]
 
 ---
 
 ## Troubleshooting
 - If OAuth fails, double‑check the **redirect URI** and **tenant/client IDs** in Azure AD. Ensure scopes include `openid profile email`. citeturn3search48
 - If uploads fail, confirm MinIO is running (`docker ps`) and Endpoint/keys in `.env` match the storage account name/key. The gateway exposes an S3 API on port 9000. citeturn8search54
-- For DB connectivity, ensure `sslmode=require` is present in `DATABASE_URL` as Azure Postgres enforces SSL in production. citeturn3search43
+- For DB connectivity, ensure `sslmode=require` is present in `DATABASE_URL` as Azure Postgres enforces SSL in production. 
