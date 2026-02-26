@@ -19,7 +19,7 @@ Outline expects an S3-compatible API when not using local storage. MinIO’s **A
 ---
 
 ## Prerequisites
-1. Azure subscription and a Service Principal for CI (ARM_CLIENT_ID/SECRET/TENANT_ID/SUBSCRIPTION_ID). citeturn3search25
+1. Azure subscription and a Service Principal for CI (ARM_CLIENT_ID/SECRET/TENANT_ID/SUBSCRIPTION_ID). 
 2. Terraform remote backend (Azure Storage). Use the provided script: 
    ```bash
    ./scripts/bootstrap/create-remote-backend.sh rg-tf-backend westeurope stoutlineXXXX tfstate
